@@ -125,7 +125,7 @@ mod helpers {
 
     pub fn do_sign_request<E: EthSpec, T: RemoteSignerObject>(
         test_client: &RemoteSignerHttpClient,
-        test_input: &SignTestData<E, T>,
+        test_input: SignTestData<E, T>,
     ) -> Result<String, Error> {
         let mut runtime = Builder::new()
             .threaded_scheduler()
@@ -156,7 +156,7 @@ mod sign_block {
         let test_client = set_up_test_client(&test_signer.address);
         let test_input = get_input_data_block();
 
-        let signature = do_sign_request(&test_client, &test_input);
+        let signature = do_sign_request(&test_client, test_input);
 
         assert_eq!(signature.unwrap(), HAPPY_PATH_BLOCK_SIGNATURE);
 
@@ -175,7 +175,7 @@ mod sign_attestation {
         let test_client = set_up_test_client(&test_signer.address);
         let test_input = get_input_data_attestation();
 
-        let signature = do_sign_request(&test_client, &test_input);
+        let signature = do_sign_request(&test_client, test_input);
 
         assert_eq!(signature.unwrap(), HAPPY_PATH_ATT_SIGNATURE);
 
@@ -198,7 +198,7 @@ mod randao {
         // Test that the data field is actually empty!
         // i.e. that this DummyRandao hack (only for tests) works.
 
-        let signature = do_sign_request(&test_client, &test_input);
+        let signature = do_sign_request(&test_client, test_input);
 
         assert_eq!(signature.unwrap(), HAPPY_PATH_RANDAO_SIGNATURE);
 

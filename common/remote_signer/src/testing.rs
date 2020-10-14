@@ -10,7 +10,9 @@ mod helpers {
     use tokio::runtime::Builder;
     use tokio::time::Duration;
     use tree_hash::TreeHash;
-    use types::{ChainSpec, Checkpoint, Domain, Epoch, EthSpec, Fork, Hash256, SignedRoot};
+    use types::{
+        ChainSpec, Checkpoint, Domain, Epoch, EthSpec, Fork, Hash256, MainnetEthSpec, SignedRoot,
+    };
 
     pub const HAPPY_PATH_BLOCK_SIGNATURE: &str = "0xaa38076a7f03ecd0f5dbb9a0ea966c1f2a859a6f11820eb498f73e0ec91f41e176947361e39cbd7661bccc827db7d8f400bd06d0a7fdd8a4a40683b7e704f72c8461e63f61c6b204c2debe7ef16e399a882ce8433c700b6bceca7b33e60a3f5f";
 
@@ -91,6 +93,11 @@ mod helpers {
             epoch: Epoch::from(epoch_num),
             root: Hash256::zero(),
         }
+    }
+
+    pub fn get_input_data_randao() -> SignTestData<'static, MainnetEthSpec, DummyRandao> {
+        let spec = &MainnetEthSpec::default_spec();
+        SignTestData::new(spec, None, Domain::Randao)
     }
 
     pub fn do_sign_request<E: EthSpec, T: RemoteSignerObject>(
@@ -185,19 +192,13 @@ mod sign_attestation {
 mod randao {
     use crate::testing::helpers::*;
     use server_helpers::*;
-    use types::{Domain, EthSpec, MainnetEthSpec};
 
     #[test]
     fn happy_path() {
         let (test_signer, _tmp_dir) = set_up_api_test_signer_to_sign_message();
         let test_client = set_up_test_client(&test_signer.address);
 
-        // TODO
-        // This bit can be cleaner.
-        let spec = &MainnetEthSpec::default_spec();
-        let test_input: SignTestData<MainnetEthSpec, DummyRandao> =
-            SignTestData::new(spec, None, Domain::Randao);
-        // end warning
+        let test_input = get_input_data_randao();
 
         // TODO
         // Test that the data field is actually empty!

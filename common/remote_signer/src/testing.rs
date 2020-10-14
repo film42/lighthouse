@@ -11,7 +11,8 @@ mod helpers {
     use tokio::time::Duration;
     use tree_hash::TreeHash;
     use types::{
-        ChainSpec, Checkpoint, Domain, Epoch, EthSpec, Fork, Hash256, MainnetEthSpec, SignedRoot,
+        AttestationData, BeaconBlock, ChainSpec, Checkpoint, Domain, Epoch, EthSpec, Fork, Hash256,
+        MainnetEthSpec, SignedRoot, Slot,
     };
 
     pub const HAPPY_PATH_BLOCK_SIGNATURE: &str = "0xaa38076a7f03ecd0f5dbb9a0ea966c1f2a859a6f11820eb498f73e0ec91f41e176947361e39cbd7661bccc827db7d8f400bd06d0a7fdd8a4a40683b7e704f72c8461e63f61c6b204c2debe7ef16e399a882ce8433c700b6bceca7b33e60a3f5f";
@@ -56,10 +57,10 @@ mod helpers {
         }
     }
 
-    pub struct SignTestData<'a, E: EthSpec, T: RemoteSignerObject> {
+    pub struct SignTestData<E: EthSpec, T: RemoteSignerObject> {
         public_key: String,
         bls_domain: Domain,
-        data: Option<&'a T>,
+        data: Option<T>,
         fork: Fork,
         epoch: Epoch,
         genesis_validators_root: Hash256,
@@ -68,8 +69,8 @@ mod helpers {
         _phantom: PhantomData<E>,
     }
 
-    impl<'a, E: EthSpec, T: RemoteSignerObject> SignTestData<'a, E, T> {
-        pub fn new(spec: &ChainSpec, data: Option<&'a T>, bls_domain: Domain) -> Self {
+    impl<'a, E: EthSpec, T: RemoteSignerObject> SignTestData<E, T> {
+        pub fn new(spec: &ChainSpec, data: Option<T>, bls_domain: Domain) -> Self {
             Self {
                 public_key: PUBLIC_KEY_1.to_string(),
                 bls_domain,
@@ -95,7 +96,29 @@ mod helpers {
         }
     }
 
-    pub fn get_input_data_randao() -> SignTestData<'static, MainnetEthSpec, DummyRandao> {
+    pub fn get_input_data_block() -> SignTestData<MainnetEthSpec, BeaconBlock<MainnetEthSpec>> {
+        let spec = &MainnetEthSpec::default_spec();
+        let block = BeaconBlock::empty(spec);
+        SignTestData::new(spec, Some(block), Domain::BeaconProposer)
+    }
+
+    pub fn get_input_data_attestation() -> SignTestData<MainnetEthSpec, AttestationData> {
+        let source = build_checkpoint(42);
+        let target = build_checkpoint(73);
+        let index = 0u64;
+        let slot = Slot::from(0u64);
+        let attestation = AttestationData {
+            slot,
+            index,
+            beacon_block_root: Hash256::zero(),
+            source,
+            target,
+        };
+        let spec = &MainnetEthSpec::default_spec();
+        SignTestData::new(spec, Some(attestation), Domain::BeaconAttester)
+    }
+
+    pub fn get_input_data_randao() -> SignTestData<MainnetEthSpec, DummyRandao> {
         let spec = &MainnetEthSpec::default_spec();
         SignTestData::new(spec, None, Domain::Randao)
     }
@@ -126,20 +149,12 @@ mod helpers {
 mod sign_block {
     use crate::testing::helpers::*;
     use server_helpers::*;
-    use types::{BeaconBlock, Domain, EthSpec, MainnetEthSpec};
 
     #[test]
     fn happy_path() {
         let (test_signer, _tmp_dir) = set_up_api_test_signer_to_sign_message();
         let test_client = set_up_test_client(&test_signer.address);
-
-        // TODO
-        // This bit can be cleaner.
-        let spec = &MainnetEthSpec::default_spec();
-        let block = BeaconBlock::empty(spec);
-        let test_input: SignTestData<MainnetEthSpec, BeaconBlock<MainnetEthSpec>> =
-            SignTestData::new(spec, Some(&block), Domain::BeaconProposer);
-        // end warning
+        let test_input = get_input_data_block();
 
         let signature = do_sign_request(&test_client, &test_input);
 
@@ -153,32 +168,12 @@ mod sign_block {
 mod sign_attestation {
     use crate::testing::helpers::*;
     use server_helpers::*;
-    use types::{AttestationData, Domain, EthSpec, Hash256, MainnetEthSpec, Slot};
 
     #[test]
     fn happy_path() {
         let (test_signer, _tmp_dir) = set_up_api_test_signer_to_sign_message();
         let test_client = set_up_test_client(&test_signer.address);
-
-        // TODO
-        // In case you are wondering, this is not clean at all!
-        let source = build_checkpoint(42);
-        let target = build_checkpoint(73);
-        let index = 0u64;
-        let slot = Slot::from(0u64);
-        let attestation = AttestationData {
-            slot,
-            index,
-            beacon_block_root: Hash256::zero(),
-            source,
-            target,
-        };
-        // end warning
-
-        let spec = &MainnetEthSpec::default_spec();
-
-        let test_input: SignTestData<MainnetEthSpec, AttestationData> =
-            SignTestData::new(spec, Some(&attestation), Domain::BeaconAttester);
+        let test_input = get_input_data_attestation();
 
         let signature = do_sign_request(&test_client, &test_input);
 
@@ -197,7 +192,6 @@ mod randao {
     fn happy_path() {
         let (test_signer, _tmp_dir) = set_up_api_test_signer_to_sign_message();
         let test_client = set_up_test_client(&test_signer.address);
-
         let test_input = get_input_data_randao();
 
         // TODO
